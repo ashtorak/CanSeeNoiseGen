@@ -23,3 +23,6 @@ I have to check how to properly connect the I2S board to the ESP. It seems very 
 The manual for the ESP says to put pullup resistors at the I2S pins. But this didn't do anything for me.
 
 Regarding SD card reading speed, I have tried different boards and combinations and found that the used components give the best speeds up to 25 MHz. If it is too slow (10 MHz), there will be errors when several samples are played in parallel.
+
+
+Post in German Zoe forum: https://www.goingelectric.de/forum/viewtopic.php?f=63&t=52091&p=1571585#p1571585

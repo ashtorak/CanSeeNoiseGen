@@ -6,8 +6,8 @@ static bool fetched = false;
 
 void setConfigDefault_3 () {
   cs_config.version                   = 3;         // change if length of config changes
-  cs_config.can0_rx                   = GPIO_NUM_34;
-  cs_config.can0_tx                   = GPIO_NUM_25;
+  cs_config.can0_rx                   = GPIO_NUM_16;
+  cs_config.can0_tx                   = GPIO_NUM_17;
   cs_config.can0_speed                = (uint16_t)CAN_SPEED_1000KBPS;
   /* On ESP32 Rev. 3 can bus speed needs to be set to twice the old value. Before it was 500KBPS.
   See https://gitlab.com/jeroenmeijer/cansee/-/issues/17 or 

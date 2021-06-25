@@ -69,6 +69,24 @@ int byte2 = 0;
 bool pollFrame = false;
 int pollFrameId;
 
+// Temperature measurement with thermistor ***********************************
+static bool usethermistor = false;
+// which analog pin to connect
+#define THERMISTORPIN A1         
+// resistance at 25 degrees C
+#define THERMISTORNOMINAL 10000      
+// temp. for nominal resistance (almost always 25 C)
+#define TEMPERATURENOMINAL 25   
+// how many samples to take and average, more takes longer
+// but is more 'smooth'
+#define NUMTEMPSAMPLES 5
+// The beta coefficient of the thermistor (usually 3000-4000)
+#define BCOEFFICIENT 3950
+// the value of the 'other' resistor
+#define SERIESRESISTOR 10000    
+
+int temperature_samples[5];
+
 // Tidy up defs **************************************************************
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
@@ -209,12 +227,6 @@ void ticker10ms()
 
   audio_soundModulator(pedal, elecRPM);
 
-  // poll a frame (with 'p')
-  if(pollFrame)
-  {
-    requestFreeframe(pollFrameId, 0);
-  }
-
   static int tick = 0;
   
   if (++tick == 100)
@@ -227,6 +239,12 @@ void ticker10ms()
   {
     writeOutgoing(audio_debug1());
     writeOutgoing(audio_debug2());
+  }
+
+  // poll a frame (with 'p')
+  if(pollFrame)
+  {
+    requestFreeframe(pollFrameId, 0);
   }
 }
 
@@ -242,6 +260,46 @@ void ticker1000ms()
   {
     ticker5000ms();
     tick = 0;
+  }
+
+  if (debugaudio && usethermistor)
+  {
+    static uint8_t i;
+    static float average;
+
+    // take N samples in a row, with a slight delay
+    for (i=0; i< NUMTEMPSAMPLES; i++) {
+    temperature_samples[i] = analogRead(THERMISTORPIN);
+    delay(10);
+    }
+    
+    // average all the samples out
+    average = 0;
+    for (i=0; i< NUMTEMPSAMPLES; i++) {
+      average += temperature_samples[i];
+    }
+    average /= NUMTEMPSAMPLES;
+
+    Serial.print("Average analog reading "); 
+    Serial.println(average);
+    
+    // convert the value to resistance
+    average = (4095-200) / average - 1;
+    average = SERIESRESISTOR / average;
+    Serial.print("Thermistor resistance "); 
+    Serial.println(average);
+    
+    float steinhart;
+    steinhart = average / THERMISTORNOMINAL;     // (R/Ro)
+    steinhart = log(steinhart);                  // ln(R/Ro)
+    steinhart /= BCOEFFICIENT;                   // 1/B * ln(R/Ro)
+    steinhart += 1.0 / (TEMPERATURENOMINAL + 273.15); // + (1/To)
+    steinhart = 1.0 / steinhart;                 // Invert
+    steinhart -= 273.15;                         // convert absolute temp to C
+    
+    Serial.print("Temperature "); 
+    Serial.print(steinhart);
+    Serial.println(" *C");
   }
 }
 

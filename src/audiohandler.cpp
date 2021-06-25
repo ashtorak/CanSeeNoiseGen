@@ -1,4 +1,5 @@
 #include "audiohandler.h"
+#include "serialhandler.h"
 
 SdFat sd; // sd card reader
 const int SDSpeedInMHz = 25; // depends on card reader and connection (empirical)
@@ -18,7 +19,7 @@ int32_t sampleMax = 0;
 
 int16_t potiValue;  // to change volume manually
 
-int volumeGlobal = 12; //1..16, int for ease of use with available Bluetooth integration
+int volumeGlobal = 1; //1..16, int for ease of use with available Bluetooth integration
 
 int elecRPM = 0; // range 0...12000
 int pedal = 0; // range 0...250 corresponds to 0...100%
@@ -87,6 +88,7 @@ void audio_init()
   // setup pins
 
   pinMode(sampleSetSelectorPin, INPUT);
+  //pinMode(potiPin, INPUT);
 
   // setup audio
 
@@ -114,13 +116,11 @@ void audio_init()
   i2s_set_pin(I2S_NUM_0, &pins);
 }
 
-// set global volume
 void audio_setVolume(int in)
 {
   volumeGlobal = in;
 }
 
-// for testing via serial input
 void audio_test(int i1, int i2, int i3)
 {
   if(i1!=0) serialMod = i1;
@@ -128,7 +128,6 @@ void audio_test(int i1, int i2, int i3)
   if(i3!=0) serialMod3 = i3;
 }
 
-// write sample to i2s
 bool playSample(int16_t sample[2]) {
 
     uint32_t s32;
@@ -144,7 +143,6 @@ bool playSample(int16_t sample[2]) {
     return true;
 }
 
-// execute sample calculation and output to i2s in fast loop
 void audio_fast()
 {
   // fill sampler buffers
@@ -196,7 +194,6 @@ void setRPMCrossPoints()
   RPMCutOff = 11000*revMod;   
 }
 
-// load samples for a car into sampler
 void audio_selectSampleSet(int number)
 {
   sampleSet = number;
@@ -260,8 +257,8 @@ void audio_selectSampleSet(int number)
     revMidRPM = 4400*revMod;
     revHighRPM = 6000*revMod;
     revMaxRPM = 7250*revMod;
-    volumeIdlingMain = 0.7;
-    volumeRevingMain = 0.88;
+    volumeIdlingMain = 0.67;
+    volumeRevingMain = 0.82;
     volumeBangMain = 1.0;
     
     setRPMCrossPoints();
@@ -274,10 +271,10 @@ void audio_selectSampleSet(int number)
     revMod = 1.0;
     revIdleRPM = 0;
     revHighRPM = 800*revMod;
-    revMaxRPM = 1600*revMod;
-    volumeIdlingMain = 0.6;
-    volumeRevingMain = 0.6;
-    
+    revMaxRPM = 1800*revMod;
+    volumeIdlingMain = 0.76;
+    volumeRevingMain = 0.96;
+
     setRPMCrossPoints();
     
     playAndLoop(3,4);
@@ -285,9 +282,10 @@ void audio_selectSampleSet(int number)
 
 }
 
-// adjust sample playback speed and volume according to car rpm and pedal position, slow loop
-void audio_soundModulator(int pedal, int elecRPM)
+void audio_soundModulator(int pedal, int elecRPM_IN)
 {
+  elecRPM = elecRPM_IN;
+
   // change sample set with button
   if(digitalRead(sampleSetSelectorPin)) 
   {
@@ -300,9 +298,17 @@ void audio_soundModulator(int pedal, int elecRPM)
   if(sampleSet!=0)
   { 
       // set volume with poti
-      // potiValue = analogRead(potiPin);
-      // volumeGlobal = 16;//(potiValue>>8)+1; // 12 bit to 4 bit (4096 to 16)
-      // pedal = potiValue/4096.0*250;
+      if(poti_ON)
+      {
+        potiValue = analogRead(potiPin);
+        volumeGlobal = (potiValue>>8)+1; // 12 bit to 4 bit (4096 to 16)
+       // Serial.print(String(potiValue));
+        //Serial.print(String(volumeGlobal));
+        // pedal = potiValue/4095.0*250;
+        elecRPM = analogRead(potiPin2)*12000/4095.0;
+       
+      }
+     
 
       if((elecRPM<1 && sampleSet!=1)) // allow reving with pedal when car is not moving and not horse or on input simulation
       {
@@ -391,7 +397,8 @@ void audio_soundModulator(int pedal, int elecRPM)
           sampler[4].setVolume(volumeRevingMax); // gallop2
           
           // adjust pitch with RPM
-          sampler[3].setPhaseIncrement(0.8+RPM/revHighRPM/2);
+          sampler[3].setPhaseIncrement(0.8+RPM/revHighRPM/2.5);
+          
           sampler[4].setPhaseIncrement(RPM/revMaxRPM);
       }
       else  // adjustments for normal reving
@@ -447,7 +454,7 @@ void audio_soundModulator(int pedal, int elecRPM)
 
 String audio_debug1()
 {
-  return "p: " +String(pedal) + " vG: "+ String(volumeGlobal)+" sampleMax: "+String(sampleMax)+"\n";
+  return "p: " +String(pedal) + " elecRPM: " +String(elecRPM) + " vG: "+ String(volumeGlobal)+" sampleMax: "+String(sampleMax)+"\n";
 
    // writeOutgoingBluetooth("pedalrpmX: "+String(pedalRPMx,5)+"\n");
    // writeOutgoingBluetooth("pedalrpmY: "+String(pedalRPMy,5)+"\n");

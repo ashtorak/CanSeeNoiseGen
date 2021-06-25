@@ -6,9 +6,11 @@
 #include "sampler.h"
 #include "driver/i2s.h"
 
-static const int sampleSetSelectorPin = 15;
+static const int sampleSetSelectorPin = 33;
 static const int chipSelectPin = 4;
-static const int potiPin = 33;
+static const int potiPin = A1;
+static const int potiPin2 = A0;
+static const bool poti_ON = true;
 
 void audio_init();
 void audio_fast();

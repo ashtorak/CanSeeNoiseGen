@@ -16,19 +16,24 @@ On 2019 or newer models a noise generator is mandatory and an off-switch is not 
 There is an integration with CanZe app in development to control the Noise Generator via bluetooth. But I haven't decided yet what to do with it. I might just release the .apk here.  
 In any case, you can use a bluetooth terminal app and send text commands there. See CanSee.ino for reference.
 
+---
 
-More technical remarks:
+**More technical remarks:**
 
 I have to check how to properly connect the I2S board to the ESP. It seems very sensitive, producing crackling on the audio output easily. The best was to make the wires as short as possible. I also found that connecting the AGND directly to the GND of the ESP board seems to help. I am not sure, why.  
 The manual for the ESP says to put pullup resistors at the I2S pins. But this didn't do anything for me.
 
 Regarding SD card reading speed, I have tried different boards and combinations and found that the used components give the best speeds up to 25 MHz. If it is too slow (10 MHz), there will be errors when several samples are played in parallel.
 
+---
+
+Short video with some explanations: https://youtu.be/ppg4cpuIZtI
 
 Thread in German Zoe forum with more info in German: https://www.goingelectric.de/forum/viewtopic.php?f=63&t=52091&p=1571585#p1571585
 
+---
 
-Installation instructions:
+**Installation instructions:**
 
 1. Install VSCode.
 2. In VSCode install the PlatformIO IDE extension. 
@@ -37,7 +42,6 @@ Installation instructions:
 5. Connect ESP32 via USB.
 6. Build the project and upload it with the buttons on the PIO bar at the bottom.
 7. For programming look into CanSee.ino and audiohandler.cpp in the src folder. The file names to load from the SD card are hard coded in the audiohandler. 22050 Hz @ 16 bit audio files are used. You can find the samples in the hardware folder. Just copy the folder content to the SD card.
-
 
 With the PlatformIO: Serial Monitor or a bluetooth terminal, you can monitor some parameters and give commands that are defined in CanSee.ino.
 

@@ -10,8 +10,9 @@ Sampler sampler[samplerCount]; // interface for the samples
 int numberOfSampleSets = 5; // includes empty set for silence (=0)
 int sampleSet = 0; // here you can set inital sample set
 int sampleSetOrder[5] = {0,2,1,3,4}; // for changing order in which to iterate through sample sets
-
 int sampleSetIterator = 0; // iterates trough sampleSetOrder
+
+boolean changeSample = false;  // for sample switching
 
 int16_t audioSample[2]; // 16 bit left/right sample for I2S output
 size_t m_bytesWritten;  // for I2S buffer, not really used
@@ -19,7 +20,7 @@ int32_t sampleMax = 0;
 
 int16_t potiValue;  // to change volume manually
 
-int volumeGlobal = 1; //1..16, int for ease of use with available Bluetooth integration
+int volumeGlobal = 9; //1..16, int for ease of use with available Bluetooth integration
 
 int elecRPM = 0; // range 0...12000
 int pedal = 0; // range 0...250 corresponds to 0...100%
@@ -87,9 +88,6 @@ void audio_init()
 
   // setup pins
 
-  pinMode(sampleSetSelectorPin, INPUT);
-  //pinMode(potiPin, INPUT);
-
   // setup audio
 
   i2s_config_t i2s_config = {
@@ -119,6 +117,14 @@ void audio_init()
 void audio_setVolume(int in)
 {
   volumeGlobal = in;
+}
+
+void audio_changeSample()
+{
+    // change sample set with button
+      sampleSetIterator++;
+      if(sampleSetIterator==numberOfSampleSets) sampleSetIterator = 0;
+      audio_selectSampleSet(sampleSetOrder[sampleSetIterator]);
 }
 
 void audio_test(int i1, int i2, int i3)
@@ -217,8 +223,8 @@ void audio_selectSampleSet(int number)
     revMidRPM = 3750*revMod;
     revHighRPM = 5500*revMod;
     revMaxRPM = 7000*revMod;
-    volumeIdlingMain = 0.99;
-    volumeRevingMain = 0.99;
+    volumeIdlingMain = 1.1;
+    volumeRevingMain = 1.1;
     volumeBangMain =   1.0;
     
     setRPMCrossPoints();
@@ -237,8 +243,8 @@ void audio_selectSampleSet(int number)
     revMidRPM = 3209*revMod;
     revHighRPM = 4360*revMod;
     revMaxRPM = 6823*revMod;
-    volumeIdlingMain = 0.8;
-    volumeRevingMain = 0.66;
+    volumeIdlingMain = 0.9;
+    volumeRevingMain = 0.85;
     volumeBangMain = 1.0;
     
     setRPMCrossPoints();
@@ -282,18 +288,10 @@ void audio_selectSampleSet(int number)
 
 }
 
-void audio_soundModulator(int pedal, int elecRPM_IN)
+void audio_soundModulator(int pedal_IN, int elecRPM_IN)
 {
+  pedal = pedal_IN;
   elecRPM = elecRPM_IN;
-
-  // change sample set with button
-  if(digitalRead(sampleSetSelectorPin)) 
-  {
-      delay(200);
-      sampleSetIterator++;
-      if(sampleSetIterator==numberOfSampleSets) sampleSetIterator = 0;
-      audio_selectSampleSet(sampleSetOrder[sampleSetIterator]);
-  }
 
   if(sampleSet!=0)
   { 
@@ -302,8 +300,6 @@ void audio_soundModulator(int pedal, int elecRPM_IN)
       {
         potiValue = analogRead(potiPin);
         volumeGlobal = (potiValue>>8)+1; // 12 bit to 4 bit (4096 to 16)
-       // Serial.print(String(potiValue));
-        //Serial.print(String(volumeGlobal));
         // pedal = potiValue/4095.0*250;
         elecRPM = analogRead(potiPin2)*12000/4095.0;
        
@@ -393,12 +389,11 @@ void audio_soundModulator(int pedal, int elecRPM_IN)
           volumeRevingMax = volumeRevingMain/(1+pow(2.71828,(-0.003*(RPM-(crossRPMHighMax-crossRPMRange)))))/(1+pow(2.71828,(0.04*(RPM-revMaxRPM*1.5))));
           }
           
-          sampler[3].setVolume(volumeRevingHigh); // gallop1
+          sampler[3].setVolume(volumeRevingHigh*0.8); // gallop1
           sampler[4].setVolume(volumeRevingMax); // gallop2
           
           // adjust pitch with RPM
           sampler[3].setPhaseIncrement(0.8+RPM/revHighRPM/2.5);
-          
           sampler[4].setPhaseIncrement(RPM/revMaxRPM);
       }
       else  // adjustments for normal reving

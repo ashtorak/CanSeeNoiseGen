@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #define VERSION "004"
-/* This is an older CanSee version. It works on a 2015 Q210.
+/* This is using an older CanSee version. It works on a 2014 Q210.
 It should work with all Phase 1 ZOEs.
 I removed all the LED code, as they are not used for the Noise Generator
 */
@@ -30,23 +30,25 @@ I removed all the LED code, as they are not used for the Noise Generator
 
 My board: Adafruit HUZZAH32 - ESP32 Feather
 
-ESP32 GPIO 34 - CAN CTX
-ESP32 GPIO 25 - CAN CRX
+CAN bus:
+ESP32 GPIO 16 - RX - CAN
+ESP32 GPIO 17 - TX - CAN
 
 SD card pins:
-ESP32 GPIO 4 - CS
-ESP32 GPIO  - SCK
-ESP32 GPIO  - MISO
-ESP32 GPIO  - MOSI
+ESP32 GPIO 4 - A5 - CS
+ESP32 GPIO 5 - SCK
+ESP32 GPIO 19 - MI - MISO
+ESP32 GPIO 18 - MO -  MOSI
 
 I2S pins:
-ESP32 GPIO 22 - Bit Clock
-ESP32 GPIO 14 - wclk, Left/Right Clock
-ESP32 GPIO 23 - Data Out
+ESP32 GPIO 22 - SCL - Bit Clock
+ESP32 GPIO 14 - A6 - wclk, Left/Right Clock
+ESP32 GPIO 23 - SDA - Data Out
 
-Manual control pins:
-ESP32 GPIO 15 - switch  // for samples
-ESP32 GPIO 33 - poti    // for volume, optional
+Misc pins:
+ESP32 GPIO 25 - A1 - potiPin1 (see audiohandler)
+ESP32 GPIO 26 - A0 - potiPin2 or for Thermistor
+ESP32 GPIO 33 - A9 - sampleSetSelectorPin
 
 */
 
@@ -70,9 +72,9 @@ bool pollFrame = false;
 int pollFrameId;
 
 // Temperature measurement with thermistor ***********************************
-static bool usethermistor = false;
+static bool usethermistor = true;
 // which analog pin to connect
-#define THERMISTORPIN A1         
+#define THERMISTORPIN A0         
 // resistance at 25 degrees C
 #define THERMISTORNOMINAL 10000      
 // temp. for nominal resistance (almost always 25 C)
@@ -86,6 +88,19 @@ static bool usethermistor = false;
 #define SERIESRESISTOR 10000    
 
 int temperature_samples[5];
+
+// For Zoe capacitive switch for sample selection ****************************
+
+#include <CircularBuffer.h> // add via PlatformIO manager
+// it probably could be done without this library but I used it for testing and kept it
+static const int touchBuffersize = 50;
+/* The touchRead() function reads a number of sawtooths on a pin to see if the 
+  capacity changes. The readings fluctuate quite a bit. So it's necessary to 
+  average over larger number of samples which are stored in this buffer
+*/
+CircularBuffer<int, touchBuffersize> touchBuffer;
+static const int sampleSetSelectorPin = 33;
+int avg;
 
 // Tidy up defs **************************************************************
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
@@ -110,7 +125,7 @@ typedef struct
 // additional command stuff  *************************************************
 String readBuffer = "";
 bool pedalCommand = false; // from bluetooth, for sound mod
-bool debugaudio = false;
+bool debugaudio = false; // can be changed by command 'x'
 
 //* counters *****************************************************************
 uint32_t canFrameCounter = 1;
@@ -156,6 +171,9 @@ void setup()
   isotp_init();
 
   audio_init();
+
+  // for measuring as long as possible on Zoe switch
+  touchSetCycles(0x9999,0x10);
 }
 
 // ***************************************************************************
@@ -180,7 +198,7 @@ void tickerFast()
   isotp_ticker();
   
   audio_fast();
-
+  
 // end do Fast
 
   if ((nowMicros - lastMicros) > 10000L)
@@ -226,7 +244,9 @@ void ticker10ms()
   // elecRPM = (byte1<<3 | byte2>>5)*10; // combine 0111 1111 1000 and 0111    
 
   audio_soundModulator(pedal, elecRPM);
-
+  
+  touch();
+  
   static int tick = 0;
   
   if (++tick == 100)
@@ -236,9 +256,10 @@ void ticker10ms()
     //Serial.println(sampleSet);
   }
   if(tick==10 && debugaudio)
-  {
+  {  
     writeOutgoing(audio_debug1());
     writeOutgoing(audio_debug2());
+    writeOutgoing("avg: " + String(avg) + "\n");
   }
 
   // poll a frame (with 'p')
@@ -270,7 +291,7 @@ void ticker1000ms()
     // take N samples in a row, with a slight delay
     for (i=0; i< NUMTEMPSAMPLES; i++) {
     temperature_samples[i] = analogRead(THERMISTORPIN);
-    delay(10);
+   // delay(10);
     }
     
     // average all the samples out
@@ -280,14 +301,14 @@ void ticker1000ms()
     }
     average /= NUMTEMPSAMPLES;
 
-    Serial.print("Average analog reading "); 
-    Serial.println(average);
+   // Serial.print("Average analog reading "); 
+   // Serial.println(average);
     
     // convert the value to resistance
     average = (4095-200) / average - 1;
     average = SERIESRESISTOR / average;
-    Serial.print("Thermistor resistance "); 
-    Serial.println(average);
+   // Serial.print("Thermistor resistance "); 
+   // Serial.println(average);
     
     float steinhart;
     steinhart = average / THERMISTORNOMINAL;     // (R/Ro)
@@ -297,9 +318,10 @@ void ticker1000ms()
     steinhart = 1.0 / steinhart;                 // Invert
     steinhart -= 273.15;                         // convert absolute temp to C
     
-    Serial.print("Temperature "); 
-    Serial.print(steinhart);
-    Serial.println(" *C");
+   // Serial.print("Temperature "); 
+  //  Serial.print(steinhart);
+  //  Serial.println(" *C");
+  writeOutgoing("temperature: " + String(steinhart) + "\n");
   }
 }
 
@@ -612,4 +634,33 @@ COMMAND_t decodeCommand(String &input)
     }
   }
   return result;
+}
+
+// check Zoe switch with ESP32 touch functionality
+void touch() {
+
+  touchBuffer.push(touchRead(sampleSetSelectorPin));
+  
+  static int total = 0;
+
+	for (int i = 0; i <touchBuffersize; i++) {
+	total += touchBuffer[i];
+	}
+
+  avg = total / (touchBuffersize);
+  total=0;
+
+  // prevent double switching with timer
+  static int timer=0;
+  static boolean ready=false; // to not switch on startup
+  if(!ready && timer<60) timer++; // timer in tens of millisesconds
+  else ready = true;
+
+  if(avg<11 && ready) // avg touch read value might vary slightly between cars (unconfirmed)
+  {
+    audio_changeSample();
+    timer = 0;
+    ready = false;
+  }
+
 }

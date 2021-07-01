@@ -40,4 +40,5 @@ Installation instructions:
 
 
 With the PlatformIO: Serial Monitor or a bluetooth terminal, you can monitor some parameters and give commands that are defined in CanSee.ino.
+
 Attention: The ESP32 and the programm store some configurations options on an EEPROM. For example, you can switch on and off bluetooth and it keeps the state also during power off. When you start the ESP and you don't have bluetooth or the serial output available, it might just be configured like this. See config.cpp for the initial configuration. If you change this configuration later on and upload it to the ESP, in order to actually load the new settings into the EEPROM you have to use the special function setConfigToEeprom(true) or 'z' via the terminal.

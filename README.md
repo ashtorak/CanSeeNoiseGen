@@ -35,9 +35,11 @@ Thread in German Zoe forum with more info in German: https://www.goingelectric.d
 
 **Installation instructions:**
 
+Warning: All here is work in progress. Don't expect everything working right out of the box. Programming experience is necessary. If something is unclear, open an issue or go to the forum.
+
 1. Install VSCode.
 2. In VSCode install the PlatformIO IDE extension. 
-3. Go to PlatformIO Home (there should appear a bar at the bottom with a house). Then in "Open Project" select this whole folder from Github. Then it should install also the libraries by itself from platform.ini. Else, you can install them in PIO Home. Also, sometimes it might be necessary to close and open VSCode again so that it finds all the dependencies. 
+3. Go to PlatformIO Home (there should appear a bar at the bottom with a house). Then in "Open Project" select this whole folder from Github. Then it should install also the libraries by itself from platformio.ini. Else, you can install them in PIO Home. Also, sometimes it might be necessary to close and open VSCode again so that it finds all the dependencies. 
 4. Copy custom.csv to \.platformio\packages\framework-arduinoespressif32\tools\partitions (the program is so large that it needs more memory than default)
 5. Connect ESP32 via USB.
 6. Build the project and upload it with the buttons on the PIO bar at the bottom.
